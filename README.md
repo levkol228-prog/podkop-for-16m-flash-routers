@@ -2,3 +2,5 @@
 # ВНИМАНИЕ!!!! За сломанные роутеры или еще какие неполадки я не несу ответсвенности все делайте на свой страх и риск!
 # + по всем вопросом идите к ИИ я скорее всего не смогу вам помоч
 тестировалось на роутере Cudy wr3000 v1 и openwrt 25.12.4 r32933-4ccb782af
+
+установить: sh <(wget -O - https://raw.githubusercontent.com/levkol228-prog/podkop-for-16m-flash-routers/refs/heads/main/install.sh)
