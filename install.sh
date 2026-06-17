@@ -20,9 +20,6 @@ pkg_is_installed () {
     local pkg_name="$1"
 
     if [ "$PKG_IS_APK" -eq 1 ]; then
-        # grep -q should work without change based on example from documentation
-        # apk list --installed --providers dnsmasq
-        # <dnsmasq> dnsmasq-full-2.90-r3 x86_64 {feeds/base/package/network/services/dnsmasq} (GPL-2.0) [installed]
         apk list --installed | grep -q "$pkg_name"
     else
         opkg list-installed | grep -q "$pkg_name"
@@ -33,8 +30,6 @@ pkg_remove() {
     local pkg_name="$1"
 
     if [ "$PKG_IS_APK" -eq 1 ]; then
-        # TODO: check --force-depends flag
-        # Nothing here: https://openwrt.org/docs/guide-user/additional-software/opkg-to-apk-cheatsheet
         apk del "$pkg_name"
     else
         opkg remove --force-depends "$pkg_name"
@@ -53,8 +48,6 @@ pkg_install() {
     local pkg_file="$1"
 
     if [ "$PKG_IS_APK" -eq 1 ]; then
-        # Can't install without flag based on info from documentation
-        # If you're installing a non-standard (self-built) package, use the --allow-untrusted option:
         apk add --allow-untrusted "$pkg_file"
     else
         opkg install "$pkg_file"
@@ -72,14 +65,6 @@ update_config() {
 
     echo ""
 
-    printf "\033[48;5;196m\033[1m╔══════════════════════════════════════════════════════════════════════╗\033[0m\n"
-    printf "\033[48;5;196m\033[1m║ ! Detected old podkop version.                                       ║\033[0m\n"
-    printf "\033[48;5;196m\033[1m║ If you continue the update, you will need to RECONFIGURE podkop.     ║\033[0m\n"
-    printf "\033[48;5;196m\033[1m║ Your old configuration will be saved to /etc/config/podkop-070       ║\033[0m\n"
-    printf "\033[48;5;196m\033[1m║ Details: https://github.com/itdoginfo/podkop                         ║\033[0m\n"
-    printf "\033[48;5;196m\033[1m║ Are you sure you want to continue?                                   ║\033[0m\n"
-    printf "\033[48;5;196m\033[1m╚══════════════════════════════════════════════════════════════════════╝\033[0m\n"
-
     msg "Continue? (yes/no)"
 
     while true; do
@@ -96,13 +81,12 @@ update_config() {
                 msg "Exit"
                 exit 1
                 ;;
-        esac
+            esac
     done
 }
 
 main() {
     check_system
-    sing_box
 
     /usr/sbin/ntpd -q -p 194.190.168.1 -p 216.239.35.0 -p 216.239.35.4 -p 162.159.200.1 -p 162.159.200.123
 
@@ -153,7 +137,6 @@ main() {
         fi
     done
 
-    # Check if any files were downloaded
     if ! ls "$DOWNLOAD_DIR"/*podkop* >/dev/null 2>&1; then
         msg "No packages were downloaded successfully"
         exit 1
@@ -211,27 +194,13 @@ main() {
 }
 
 check_system() {
-    # Get router model
     MODEL=$(cat /tmp/sysinfo/model)
     msg "Router model: $MODEL"
 
-    # Check OpenWrt version
     openwrt_version=$(cat /etc/openwrt_release | grep DISTRIB_RELEASE | cut -d"'" -f2 | cut -d'.' -f1)
     if [ "$openwrt_version" = "23" ]; then
         msg "OpenWrt 23.05 не поддерживается начиная с podkop 0.5.0"
         msg "Для OpenWrt 23.05 используйте podkop версии 0.4.11 или устанавливайте зависимости и podkop вручную"
-        msg "Подробности: https://podkop.net/docs/install/#%d1%83%d1%81%d1%82%d0%b0%d0%bd%d0%be%d0%b2%d0%ba%d0%b0-%d0%bd%d0%b0-2305"
-        exit 1
-    fi
-
-    # Check available space
-    AVAILABLE_SPACE=$(df /overlay | awk 'NR==2 {print $4}')
-    REQUIRED_SPACE=15360 # 15MB in KB
-
-    if [ "$AVAILABLE_SPACE" -lt "$REQUIRED_SPACE" ]; then
-        msg "Error: Insufficient space in flash"
-        msg "Available: $((AVAILABLE_SPACE/1024))MB"
-        msg "Required: $((REQUIRED_SPACE/1024))MB"
         exit 1
     fi
 
@@ -240,7 +209,6 @@ check_system() {
         exit 1
     fi
 
-    # Check version
     if command -v podkop > /dev/null 2>&1; then
         local version
         version=$(/usr/bin/podkop show_version 2> /dev/null)
@@ -253,12 +221,10 @@ check_system() {
             minor=$(echo "$version" | cut -d. -f2)
             patch=$(echo "$version" | cut -d. -f3)
 
-            # Compare version: must be >= 0.7.0
             if [ "$major" -gt 0 ] ||
                 [ "$major" -eq 0 ] && [ "$minor" -gt 7 ] ||
                 [ "$major" -eq 0 ] && [ "$minor" -eq 7 ] && [ "$patch" -ge 0 ]; then
                 msg "Podkop version >= 0.7.0"
-                break
             else
                 msg "Podkop version < 0.7.0"
                 update_config
@@ -286,24 +252,8 @@ check_system() {
                     msg "Exit"
                     exit 1
                     ;;
-        esac
-    done
-    fi
-}
-
-sing_box() {
-    if ! pkg_is_installed "^sing-box"; then
-        return
-    fi
-
-    sing_box_version=$(sing-box version | head -n 1 | awk '{print $3}')
-    required_version="1.12.4"
-
-    if [ "$(printf '%s\n%s\n' "$sing_box_version" "$required_version" | sort -V | head -n 1)" != "$required_version" ]; then
-        msg "sing-box version $sing_box_version is older than the required version $required_version."
-        msg "Removing old version..."
-        service podkop stop
-        pkg_remove sing-box
+                esac
+        done
     fi
 }
 
